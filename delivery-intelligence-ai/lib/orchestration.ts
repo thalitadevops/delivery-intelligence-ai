@@ -24,7 +24,7 @@ export async function orchestrate(question: string, filters: Filters) {
   const usage = { input_tokens: 0, output_tokens: 0 };
   const signal = AbortSignal.timeout(45000); // One deadline for the entire run.
   async function call(system: string, messages: Message[], phase: 'route' | 'specialist' | 'final'): Promise<Reply> {
-    const response = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST', headers: { 'x-api-key': process.env.ANTHROPIC_API_KEY!, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' }, body: JSON.stringify({ model: process.env.ANTHROPIC_MODEL || 'claude-sonnet-5-5', max_tokens: phase === 'route' ? 500 : 1000, system: `${rules}\n${system}`, messages, ...(phase === 'specialist' ? {} : { tools, tool_choice: { type: phase === 'route' ? 'any' : 'none' } }) }), signal, cache: 'no-store' });
+    const response = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST', headers: { 'x-api-key': process.env.ANTHROPIC_API_KEY!, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' }, body: JSON.stringify({ model: process.env.ANTHROPIC_MODEL || 'claude-sonnet-5-5', max_tokens: 4096, ...((process.env.ANTHROPIC_MODEL || 'claude-sonnet-5-5') === 'claude-sonnet-5-5' ? { output_config: { effort: 'medium' } } : {}), system: `${rules}\n${system}`, messages, ...(phase === 'specialist' ? {} : { tools, tool_choice: { type: phase === 'route' ? 'auto' : 'none' } }) }), signal, cache: 'no-store' });
     if (!response.ok) {
       const body = await response.json().catch(()=>null);
       const detail = typeof body?.error?.message === 'string' ? body.error.message.toLowerCase() : '';
@@ -50,7 +50,7 @@ export async function orchestrate(question: string, filters: Filters) {
     return text;
   }
   const messages: Message[] = [{ role: 'user', content: JSON.stringify({ pergunta: question, filtros: filters }) }];
-  const coordinator = 'Você é o coordenador de operações. Escolha um ou ambos os especialistas conforme a pergunta. Consulte indicadores para questões quantitativas e procedimentos para ações e investigação. No máximo uma chamada por especialista. Ao sintetizar, cite limites, evidências e até três ações priorizadas com indicador.';
+  const coordinator = 'Você é o coordenador de operações. Antes de responder, consulte um ou ambos os especialistas pelas ferramentas disponíveis, conforme a pergunta. Não responda sem consultar os especialistas. Depois de receber os resultados, sintetize sem novas chamadas. Consulte indicadores para questões quantitativas e procedimentos para ações e investigação. No máximo uma chamada por especialista. Ao sintetizar, cite limites, evidências e até três ações priorizadas com indicador.';
   const routing = await call(coordinator, messages, 'route');
   if (routing.stop_reason === 'max_tokens') throw new ProviderFailure(502, 'AGENT_RESPONSE_TRUNCATED');
   const requests = routing.content.filter((b): b is ToolBlock => b.type === 'tool_use');

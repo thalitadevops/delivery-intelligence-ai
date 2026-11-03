@@ -1,5 +1,13 @@
 # Validação desta entrega
 
+## Correção de compatibilidade Sonnet 5.5 - 03/11/2026
+
+Corrigida seleção de ferramentas de `any` para `auto`: Sonnet 5.5 rejeita ferramentas forçadas com HTTP 400, conforme documentação oficial. Limite de resposta ampliado para 4096 tokens por chamada e esforço medium para o modelo padrão, incluindo espaço para raciocínio. O coordenador continua exigindo um plano válido antes de chamar especialistas; se o modelo não delegar, não simula a delegação. Diagnósticos distinguem credenciais, créditos, modelo, requisição rejeitada e resposta truncada.
+
+39 testes passaram e o build Next.js passou. Chamadas de API seguem simuladas nos testes; a correção precisa ser publicada e validada com a conta real. Até quatro chamadas podem consumir mais tokens com o limite ampliado; não houve medição de custo real.
+
+Referência: https://platform.claude.com/docs/en/agents-and-tools/tool-use/define-tools
+
 ## Atualização de orquestração - 03/11/2026
 
 Implementados coordenador, dois especialistas com contextos separados, protocolo tool_use/tool_result, síntese final e registro visível na interface. Testes adicionais verificam escolha de um ou dois especialistas, agregação de tokens, evidências fornecidas, validação de nomes/argumentos/duplicatas, limite de rodadas, interrupção por falha ou truncamento, proteção sem chave e integração da UI.

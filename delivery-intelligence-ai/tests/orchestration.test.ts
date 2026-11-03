@@ -30,7 +30,7 @@ describe('orquestração com provedor simulado',()=>{
     const result=await orchestrate('Como reduzir cancelamentos?',defaultFilters);
     expect(result.calls).toBe(4);expect(result.usage).toEqual({input_tokens:40,output_tokens:20});expect(result.trace.map(t=>t.id)).toEqual(['route','analyst','guide','final']);
     const payloads=fetch.mock.calls.map(c=>JSON.parse(c[1].body));
-    expect(payloads[0].tool_choice.type).toBe('any');expect(payloads[3].tool_choice.type).toBe('none');expect(payloads[1].tools).toBeUndefined();
+    expect(payloads[0].tool_choice.type).toBe('auto');expect(payloads.every(p=>p.max_tokens===4096)).toBe(true);expect(payloads.every(p=>!['any','tool'].includes(p.tool_choice?.type))).toBe(true);expect(payloads[3].tool_choice.type).toBe('none');expect(payloads[1].tools).toBeUndefined();
     const evidence=JSON.parse(payloads[1].messages[0].content).evidencias;expect(evidence.orders).toBeGreaterThan(0);
     expect(JSON.parse(payloads[2].messages[0].content).evidencias[0].id).toBe('cancelamentos');
     expect(payloads[3].messages[2].content.map((r:{tool_use_id:string})=>r.tool_use_id)).toEqual(['tool_1','tool_2']);
