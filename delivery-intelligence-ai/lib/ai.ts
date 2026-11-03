@@ -17,7 +17,7 @@ export async function budgetAvailable(): Promise<boolean> {
   if (localBudget.window !== window) { localBudget.window = window; localBudget.count = 0; }
   return ++localBudget.count <= 30;
 }
-function failure(message: string, status: number) { return Response.json({ ok: false, error: message }, { status, headers: { 'Cache-Control': 'no-store' } }); }
+function failure(message: string, status: number, code?: string) { return Response.json({ ok: false, error: message, ...(code ? {code} : {}) }, { status, headers: { 'Cache-Control': 'no-store' } }); }
 export async function handleAI(request: Request, orchestration = false): Promise<Response> {
   const origin = request.headers.get('origin');
   if (origin && origin !== new URL(request.url).origin) return failure('Origem não permitida.', 403);
@@ -48,7 +48,20 @@ export async function handleAI(request: Request, orchestration = false): Promise
     if (!text || !data.id || !data.model) return failure('Claude retornou uma resposta inesperada.', 502);
     return Response.json({ ok: true, text, model: data.model, id: data.id, usage: data.usage, filters }, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) {
-    if (error instanceof ProviderFailure) return failure(error.status === 429 ? 'Claude está ocupado. Tente novamente em instantes.' : 'Não foi possível concluir a orquestração. Verifique a configuração e tente novamente.', error.status === 429 ? 429 : 502);
+    if (error instanceof ProviderFailure) {
+      const messages: Record<string,string> = {
+        INVALID_API_KEY: 'A chave da Anthropic não foi aceita. Confira ANTHROPIC_API_KEY na Vercel e faça um novo deploy.',
+        API_ACCESS_DENIED: 'A conta da API não tem permissão para esta solicitação. Confira as permissões no console Anthropic.',
+        API_CREDITS_REQUIRED: 'A API Anthropic precisa de créditos disponíveis. Confira o saldo em Billing no console Anthropic.',
+        MODEL_UNAVAILABLE: 'O modelo configurado não foi encontrado ou não está disponível para esta conta. Confira ANTHROPIC_MODEL e faça um novo deploy.',
+        PROVIDER_RATE_LIMIT: 'Limite temporário da Anthropic atingido. Aguarde antes de tentar novamente.',
+        PROVIDER_REQUEST_REJECTED: 'A Anthropic recusou o formato ou a configuração da chamada. Consulte o registro da função na Vercel.',
+        AGENT_RESPONSE_TRUNCATED: 'Um agente atingiu o limite de resposta antes de concluir. A análise não foi finalizada.',
+        INVALID_AGENT_RESPONSE: 'Um agente retornou um plano ou resposta fora do formato esperado. A análise foi interrompida.',
+        PROVIDER_UNAVAILABLE: 'A API Anthropic está indisponível neste momento. Tente novamente mais tarde.'
+      };
+      return failure(messages[error.code] || messages.PROVIDER_UNAVAILABLE, error.status === 429 ? 429 : 502, error.code);
+    }
     return failure('Análise indisponível neste momento. Tente novamente.', 503);
   }
 }

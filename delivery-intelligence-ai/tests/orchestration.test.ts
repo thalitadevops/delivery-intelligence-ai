@@ -9,6 +9,17 @@ const text = (value: string) => ({type:'text',text:value});
 beforeEach(()=>{vi.stubEnv('ANTHROPIC_API_KEY','secret-test');vi.stubEnv('UPSTASH_REDIS_REST_URL','');vi.stubEnv('UPSTASH_REDIS_REST_TOKEN','');});
 afterEach(()=>{vi.unstubAllGlobals();vi.unstubAllEnvs();});
 describe('orquestração com provedor simulado',()=>{
+  it.each([
+    {status:401,message:'private diagnostic',code:'INVALID_API_KEY'},
+    {status:400,message:'Your credit balance is too low',code:'API_CREDITS_REQUIRED'},
+    {status:404,message:'private model diagnostic',code:'MODEL_UNAVAILABLE'},
+    {status:400,message:'tool_choice is not supported',code:'PROVIDER_REQUEST_REJECTED'},
+  ])('identifica configuração sem vazar detalhes: $code',async({status,message,code})=>{
+    vi.spyOn(console,'error').mockImplementation(()=>{});
+    vi.stubGlobal('fetch',vi.fn().mockResolvedValue(Response.json({error:{message}},{status})));
+    const response=await handleAI(new Request('http://localhost/api/ai/orchestrate',{method:'POST',body:JSON.stringify({message:'Pergunta',filters:defaultFilters})}),true);
+    const body=await response.json();expect(body.code).toBe(code);expect(JSON.stringify(body)).not.toContain(message);expect(JSON.stringify(body)).not.toContain('secret-test');
+  });
   it('bloqueia o endpoint sem chave antes de qualquer chamada',async()=>{
     vi.stubEnv('ANTHROPIC_API_KEY','');const fetch=vi.fn();vi.stubGlobal('fetch',fetch);
     const response=await handleAI(new Request('http://localhost/api/ai/orchestrate',{method:'POST',body:JSON.stringify({message:'Pergunta',filters:defaultFilters})}),true);expect(response.status).toBe(503);expect(fetch).not.toHaveBeenCalled();
